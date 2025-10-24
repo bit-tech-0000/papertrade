@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Paper Trading Demo — BSC & Solana Meme Coins</title>
+<title>Paper Trading Demo � BSC & Solana Meme Coins</title>
 <style>
 body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; padding:16px; }
 .container{max-width:1200px;margin:0 auto}
@@ -20,7 +21,7 @@ body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; paddin
 </head>
 <body>
 <div class="container">
-<h1>Paper Trading Demo — BSC & Solana Meme Coins</h1>
+<h1>Paper Trading Demo � BSC & Solana Meme Coins</h1>
 <div class="card">
   <div class="row">
     <label class="small">Chain</label>
@@ -34,7 +35,7 @@ body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; paddin
   <div class="small" style="margin-top:6px">Direct Dexscreener API without CORS proxy.</div>
 </div>
 
-<div id="statusBar" class="card small">Wallet USD: $10000 • Total Portfolio: $10000</div>
+<div id="statusBar" class="card small">Wallet USD: $10000 � Total Portfolio: $10000</div>
 <div id="tokensContainer" class="token-grid"></div>
 </div>
 
@@ -65,8 +66,16 @@ function createTokenCard(token){
   el.className='card'; el.id='card_'+token.address;
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <div><strong>${token.name}</strong> <span class="small">${token.symbol}</span><div class="small">${token.address}</div></div>
-      <div style="text-align:right"><div class="small">Price</div><div id="price_${token.address}" style="font-family:monospace;font-weight:700">${formatUsd(token.price)}</div></div>
+      <div>
+        <strong>${token.name}</strong>
+        <span class="small">${token.symbol}</span>
+        <div class="small">${token.address}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="small">Price</div>
+        <div id="price_${token.address}" style="font-family:monospace;font-weight:700">${formatUsd(token.price)}</div>
+        <div class="small">Market Cap: <span id="mcap_${token.address}">${formatUsd(token.mcap||0)}</span></div>
+      </div>
     </div>
     <div style="margin-top:6px" class="small" id="error_${token.address}"></div>
     <div class="row" style="margin-top:8px">
@@ -99,7 +108,12 @@ function createTokenCard(token){
 function updateTokenUI(addr){
   const t = tokens[addr];
   if(!t) return;
-  const priceEl = document.getElementById('price_'+addr); if(priceEl) priceEl.textContent=formatUsd(t.price);
+  const priceEl = document.getElementById('price_'+addr); 
+  if(priceEl) priceEl.textContent = formatUsd(t.price);
+
+  const mcapEl = document.getElementById('mcap_'+addr);
+  if(mcapEl) mcapEl.textContent = formatUsd(t.mcap||0);
+
   const pos = state.positions[addr]||{qty:0,avg:0,realized:0};
   document.getElementById('hold_'+addr).textContent=(pos.qty||0).toFixed(6);
   document.getElementById('avg_'+addr).textContent=formatUsd(pos.avg||0);
@@ -117,6 +131,7 @@ async function pollPrice(addr){
     const data = await fetchDex(addr);
     const pair = data.pairs[0];
     t.price = pair.priceUsd?+pair.priceUsd:+(pair.price||0);
+    t.mcap = pair.fdv?+pair.fdv:0; // <-- Market Cap update
     updateTokenUI(addr);
     renderWallet();
   }catch(e){
@@ -163,7 +178,7 @@ function renderWallet(){
     const pos=state.positions[addr]||{qty:0};
     total += (pos.qty||0)*t.price;
   });
-  statusBar.textContent = `Wallet USD: ${formatUsd(state.wallet.USD)} • Total Portfolio: ${formatUsd(total)}`;
+  statusBar.textContent = `Wallet USD: ${formatUsd(state.wallet.USD)} � Total Portfolio: ${formatUsd(total)}`;
 }
 
 function addToken(){
@@ -177,7 +192,14 @@ function addToken(){
     const pair=data.pairs[0];
     const symbol = data.token?.symbol || pair.baseToken?.symbol || addr.slice(0,6);
     const name = data.token?.name || symbol;
-    const t={address:addr,chain,symbol,name,price:pair.priceUsd?+pair.priceUsd:+(pair.price||0)};
+    const t={
+      address:addr,
+      chain,
+      symbol,
+      name,
+      price: pair.priceUsd?+pair.priceUsd:+(pair.price||0),
+      mcap: pair.fdv?+pair.fdv:0 // <-- Market Cap
+    };
     tokens[addr]=t;
     createTokenCard(t);
     tokenAddrEl.value='';
@@ -199,5 +221,3 @@ setInterval(()=>{ Object.keys(tokens).forEach(addr=>pollPrice(addr)); }, 500);
 </script>
 </body>
 </html>
-
-
