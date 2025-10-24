@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Paper Trading Demo — BSC & Solana Meme Coins</title>
+<title>Paper Trading Demo â€” BSC & Solana Meme Coins</title>
 <style>
 body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; padding:16px; }
 .container{max-width:1200px;margin:0 auto}
@@ -20,7 +20,7 @@ body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; paddin
 </head>
 <body>
 <div class="container">
-<h1>Paper Trading Demo — BSC & Solana Meme Coins</h1>
+<h1>Paper Trading Demo â€” BSC & Solana Meme Coins</h1>
 <div class="card">
   <div class="row">
     <label class="small">Chain</label>
@@ -34,7 +34,7 @@ body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; paddin
   <div class="small" style="margin-top:6px">CORS Proxy is applied automatically for Dexscreener API.</div>
 </div>
 
-<div id="statusBar" class="card small">Wallet USD: $10000 • Total Portfolio: $10000</div>
+<div id="statusBar" class="card small">Wallet USD: $10000 â€¢ Total Portfolio: $10000</div>
 <div id="tokensContainer" class="token-grid"></div>
 </div>
 
@@ -51,7 +51,7 @@ function formatUsd(v){ if(!isFinite(v)) return '$0.00'; return v>=1? '$'+v.toFix
 
 // Dexscreener fetch with CORS proxy
 async function fetchDex(addr){
-  const corsProxy = 'https://api.allorigins.win/raw?url=';
+
   const url = `https://api.dexscreener.com/latest/dex/tokens/${addr}`;
   const finalUrl = corsProxy + encodeURIComponent(url);
   statusBar.textContent = `Fetching ${addr}...`;
@@ -164,7 +164,7 @@ function renderWallet(){
     const pos=state.positions[addr]||{qty:0};
     total += (pos.qty||0)*t.price;
   });
-  statusBar.textContent = `Wallet USD: ${formatUsd(state.wallet.USD)} • Total Portfolio: ${formatUsd(total)}`;
+  statusBar.textContent = `Wallet USD: ${formatUsd(state.wallet.USD)} â€¢ Total Portfolio: ${formatUsd(total)}`;
 }
 
 function addToken(){
@@ -193,3 +193,4 @@ addTokenBtn.addEventListener('click',addToken);
 </script>
 </body>
 </html>
+
