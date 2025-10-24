@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Trading Demo — BSC & Solana Meme Coins</title>
+<style>
+body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; padding:16px; }
+.container{max-width:1200px;margin:0 auto}
+.card{background:#0b1522;padding:12px;border-radius:8px;margin-bottom:12px;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.input{padding:6px;border-radius:6px;border:0;background:#071428;color:#e6eef8;}
+.btn{background:#7c3aed;color:white;padding:6px 12px;border-radius:6px;border:0;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:#94a3b8;padding:6px 10px;border-radius:6px;}
+.small{font-size:12px;color:#94a3b8;}
+.token-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;}
+.green{color:#16a34a}.red{color:#ef4444}
+@media (max-width:900px){ .token-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Paper Trading Demo — BSC & Solana Meme Coins</h1>
+<div class="card">
+  <div class="row">
+    <label class="small">Chain</label>
+    <select id="chainSelect" class="input small" style="width:120px">
+      <option value="bsc">BSC</option>
+      <option value="solana">Solana</option>
+    </select>
+    <input id="tokenAddr" class="input" placeholder="Paste token address">
+    <button id="addToken" class="btn">Add Token</button>
+  </div>
+  <div class="small" style="margin-top:6px">CORS Proxy is applied automatically for Dexscreener API.</div>
+</div>
+
+<div id="statusBar" class="card small">Wallet USD: $10000 • Total Portfolio: $10000</div>
+<div id="tokensContainer" class="token-grid"></div>
+</div>
+
+<script>
+let tokens = {};
+let state = { wallet:{USD:10000}, positions:{}, orders:[], trades:[] };
+const tokenAddrEl = document.getElementById('tokenAddr');
+const addTokenBtn = document.getElementById('addToken');
+const tokensContainer = document.getElementById('tokensContainer');
+const statusBar = document.getElementById('statusBar');
+const chainSelect = document.getElementById('chainSelect');
+
+function formatUsd(v){ if(!isFinite(v)) return '$0.00'; return v>=1? '$'+v.toFixed(2) : '$'+v.toFixed(6); }
+
+// Dexscreener fetch with CORS proxy
+async function fetchDex(addr){
+  const corsProxy = 'https://api.allorigins.win/raw?url=';
+  const url = `https://api.dexscreener.com/latest/dex/tokens/${addr}`;
+  const finalUrl = corsProxy + encodeURIComponent(url);
+  statusBar.textContent = `Fetching ${addr}...`;
+  const res = await fetch(finalUrl);
+  if(!res.ok) throw new Error(res.status);
+  const data = await res.json();
+  statusBar.textContent = `Fetched ${addr}`;
+  return data;
+}
+
+function createTokenCard(token){
+  const el = document.createElement('div');
+  el.className='card'; el.id='card_'+token.address;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong>${token.name}</strong> <span class="small">${token.symbol}</span><div class="small">${token.address}</div></div>
+      <div style="text-align:right"><div class="small">Price</div><div id="price_${token.address}" style="font-family:monospace;font-weight:700">${formatUsd(token.price)}</div></div>
+    </div>
+    <div style="margin-top:6px" class="small" id="error_${token.address}"></div>
+    <div class="row" style="margin-top:8px">
+      <select id="side_${token.address}" class="input small" style="width:80px"><option value="buy">BUY</option></select>
+      <input id="usd_${token.address}" class="input small" style="width:100px" placeholder="USD amount">
+      <button id="place_${token.address}" class="btn small">Place Buy</button>
+      <select id="sellPct_${token.address}" class="input small" style="width:80px">
+        <option value="10">Sell 10%</option>
+        <option value="25">Sell 25%</option>
+        <option value="50">Sell 50%</option>
+        <option value="75">Sell 75%</option>
+        <option value="100">Sell 100%</option>
+      </select>
+      <button id="sell_${token.address}" class="btn btn-ghost small">Sell</button>
+      <button id="remove_${token.address}" class="btn-ghost small">Remove</button>
+    </div>
+    <div class="small" style="margin-top:6px">
+      Holding: <strong id="hold_${token.address}">0</strong>,
+      Avg Entry: <strong id="avg_${token.address}">$0.00</strong>,
+      Unrealized: <strong id="unreal_${token.address}">$0.00</strong>,
+      Realized: <strong id="realized_${token.address}">$0.00</strong>
+    </div>
+  `;
+  tokensContainer.appendChild(el);
+  document.getElementById(`place_${token.address}`).addEventListener('click', ()=>placeBuy(token.address));
+  document.getElementById(`sell_${token.address}`).addEventListener('click', ()=>sellPercent(token.address));
+  document.getElementById(`remove_${token.address}`).addEventListener('click', ()=>removeToken(token.address));
+}
+
+function updateTokenUI(addr){
+  const t = tokens[addr];
+  if(!t) return;
+  const priceEl = document.getElementById('price_'+addr); if(priceEl) priceEl.textContent=formatUsd(t.price);
+  const pos = state.positions[addr]||{qty:0,avg:0,realized:0};
+  document.getElementById('hold_'+addr).textContent=(pos.qty||0).toFixed(6);
+  document.getElementById('avg_'+addr).textContent=formatUsd(pos.avg||0);
+  const unreal = (pos.qty||0)*(t.price-(pos.avg||0));
+  document.getElementById('unreal_'+addr).textContent=formatUsd(unreal);
+  document.getElementById('unreal_'+addr).className=unreal>=0?'green':'red';
+  document.getElementById('realized_'+addr).textContent=formatUsd(pos.realized||0);
+}
+
+async function pollPrice(addr){
+  const t = tokens[addr];
+  if(!t) return;
+  try{
+    const data = await fetchDex(addr);
+    const pair = data.pairs[0];
+    t.price = pair.priceUsd?+pair.priceUsd:+(pair.price||0);
+    updateTokenUI(addr);
+    renderWallet();
+  }catch(e){
+    document.getElementById('error_'+addr).textContent='Fetch error';
+    console.error(e);
+  }
+}
+
+function placeBuy(addr){
+  const t = tokens[addr];
+  const usd = +document.getElementById('usd_'+addr).value;
+  if(!usd || usd<=0) return alert('Enter USD > 0');
+  if(state.wallet.USD < usd) return alert('Not enough USD');
+  const pos = state.positions[addr]||{qty:0,avg:0,realized:0};
+  const newQty = usd/t.price;
+  pos.avg = ((pos.qty*pos.avg)+(newQty*t.price))/(pos.qty+newQty);
+  pos.qty += newQty;
+  state.positions[addr] = pos;
+  state.wallet.USD -= usd;
+  updateTokenUI(addr);
+  renderWallet();
+}
+
+function sellPercent(addr){
+  const t = tokens[addr];
+  const pct = +document.getElementById('sellPct_'+addr).value;
+  const pos = state.positions[addr];
+  if(!pos || pos.qty<=0) return alert('No tokens to sell');
+  const qtySell = pos.qty*(pct/100);
+  const usd = qtySell*t.price;
+  const realized = (t.price-pos.avg)*qtySell;
+  pos.qty -= qtySell;
+  pos.realized = (pos.realized||0)+realized;
+  if(pos.qty<=0) pos.avg=0;
+  state.wallet.USD += usd;
+  updateTokenUI(addr);
+  renderWallet();
+}
+
+function renderWallet(){
+  let total=state.wallet.USD;
+  Object.keys(tokens).forEach(addr=>{
+    const t=tokens[addr];
+    const pos=state.positions[addr]||{qty:0};
+    total += (pos.qty||0)*t.price;
+  });
+  statusBar.textContent = `Wallet USD: ${formatUsd(state.wallet.USD)} • Total Portfolio: ${formatUsd(total)}`;
+}
+
+function addToken(){
+  const raw=tokenAddrEl.value.trim();
+  if(!raw) return alert('Enter token address');
+  const addr=raw.toLowerCase();
+  const chain=chainSelect.value;
+  if(tokens[addr]) return alert('Already added');
+  addTokenBtn.disabled=true; addTokenBtn.textContent='Adding...';
+  fetchDex(addr).then(data=>{
+    const pair=data.pairs[0];
+    const symbol = data.token?.symbol || pair.baseToken?.symbol || addr.slice(0,6);
+    const name = data.token?.name || symbol;
+    const t={address:addr,chain,symbol,name,price:pair.priceUsd?+pair.priceUsd:+(pair.price||0)};
+    tokens[addr]=t;
+    createTokenCard(t);
+    setInterval(()=>pollPrice(addr),3000);
+    tokenAddrEl.value='';
+    updateTokenUI(addr);
+  }).catch(e=>{alert('Failed to add token'); console.error(e)}).finally(()=>{addTokenBtn.disabled=false; addTokenBtn.textContent='Add Token'});
+}
+
+function removeToken(addr){ tokensContainer.querySelector('#card_'+addr).remove(); delete tokens[addr]; delete state.positions[addr]; renderWallet(); }
+
+addTokenBtn.addEventListener('click',addToken);
+</script>
+</body>
+</html>
