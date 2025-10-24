@@ -31,7 +31,7 @@ body { font-family: Arial, sans-serif; background:#071029; color:#e6eef8; paddin
     <input id="tokenAddr" class="input" placeholder="Paste token address">
     <button id="addToken" class="btn">Add Token</button>
   </div>
-  <div class="small" style="margin-top:6px">CORS Proxy is applied automatically for Dexscreener API.</div>
+  <div class="small" style="margin-top:6px">Direct Dexscreener API without CORS proxy.</div>
 </div>
 
 <div id="statusBar" class="card small">Wallet USD: $10000 • Total Portfolio: $10000</div>
@@ -47,15 +47,13 @@ const tokensContainer = document.getElementById('tokensContainer');
 const statusBar = document.getElementById('statusBar');
 const chainSelect = document.getElementById('chainSelect');
 
-function formatUsd(v){ if(!isFinite(v)) return '$0.00'; return v>=1? '$'+v.toFixed(2) : '$'+v.toFixed(6); }
+function formatUsd(v){ return !isFinite(v)? '$0.00' : (v>=1? '$'+v.toFixed(2) : '$'+v.toFixed(6)); }
 
-// Dexscreener fetch with CORS proxy
+// Dexscreener fetch without CORS proxy
 async function fetchDex(addr){
-
   const url = `https://api.dexscreener.com/latest/dex/tokens/${addr}`;
-  const finalUrl = corsProxy + encodeURIComponent(url);
   statusBar.textContent = `Fetching ${addr}...`;
-  const res = await fetch(finalUrl);
+  const res = await fetch(url);
   if(!res.ok) throw new Error(res.status);
   const data = await res.json();
   statusBar.textContent = `Fetched ${addr}`;
@@ -106,8 +104,9 @@ function updateTokenUI(addr){
   document.getElementById('hold_'+addr).textContent=(pos.qty||0).toFixed(6);
   document.getElementById('avg_'+addr).textContent=formatUsd(pos.avg||0);
   const unreal = (pos.qty||0)*(t.price-(pos.avg||0));
-  document.getElementById('unreal_'+addr).textContent=formatUsd(unreal);
-  document.getElementById('unreal_'+addr).className=unreal>=0?'green':'red';
+  const unrealEl = document.getElementById('unreal_'+addr);
+  unrealEl.textContent=formatUsd(unreal);
+  unrealEl.className=unreal>=0?'green':'red';
   document.getElementById('realized_'+addr).textContent=formatUsd(pos.realized||0);
 }
 
@@ -181,16 +180,22 @@ function addToken(){
     const t={address:addr,chain,symbol,name,price:pair.priceUsd?+pair.priceUsd:+(pair.price||0)};
     tokens[addr]=t;
     createTokenCard(t);
-    setInterval(()=>pollPrice(addr),3000);
     tokenAddrEl.value='';
     updateTokenUI(addr);
-  }).catch(e=>{alert('Failed to add token'); console.error(e)}).finally(()=>{addTokenBtn.disabled=false; addTokenBtn.textContent='Add Token'});
+  }).catch(e=>{alert('Failed to add token'); console.error(e)}).finally(()=>{addTokenBtn.disabled=false; addTokenBtn.textContent='Add Token';});
 }
 
-function removeToken(addr){ tokensContainer.querySelector('#card_'+addr).remove(); delete tokens[addr]; delete state.positions[addr]; renderWallet(); }
+function removeToken(addr){ 
+  tokensContainer.querySelector('#card_'+addr).remove(); 
+  delete tokens[addr]; 
+  delete state.positions[addr]; 
+  renderWallet(); 
+}
 
 addTokenBtn.addEventListener('click',addToken);
+
+// Poll all token prices every 3 seconds
+setInterval(()=>{ Object.keys(tokens).forEach(addr=>pollPrice(addr)); }, 3000);
 </script>
 </body>
 </html>
-
