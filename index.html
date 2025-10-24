@@ -195,8 +195,9 @@ function removeToken(addr){
 addTokenBtn.addEventListener('click',addToken);
 
 // Poll all token prices every 3 seconds
-setInterval(()=>{ Object.keys(tokens).forEach(addr=>pollPrice(addr)); }, 3000);
+setInterval(()=>{ Object.keys(tokens).forEach(addr=>pollPrice(addr)); }, 500);
 </script>
 </body>
 </html>
+
 
