@@ -47,7 +47,7 @@ const tokensContainer = document.getElementById('tokensContainer');
 const statusBar = document.getElementById('statusBar');
 const chainSelect = document.getElementById('chainSelect');
 
-function formatUsd(v){ return !isFinite(v)? '$0.00' : (v>=1? '$'+v.toFixed(2) : '$'+v.toFixed(6)); }
+function formatUsd(v){ return !isFinite(v)? '$0.00' : (v>=1? '$'+v.toFixed(6) : '$'+v.toFixed(10)); }
 
 // Dexscreener fetch without CORS proxy
 async function fetchDex(addr){
@@ -199,3 +199,4 @@ setInterval(()=>{ Object.keys(tokens).forEach(addr=>pollPrice(addr)); }, 3000);
 </script>
 </body>
 </html>
+
